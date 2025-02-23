@@ -15,16 +15,14 @@ def get_parser():
     parser = argparse.ArgumentParser()
 
     # -- Data params ---
-    parser.add_argument("--dataset", type=str.upper, default="SMD")
-    parser.add_argument("--group", type=str, default="3-8", help="Required for SMD dataset. <group_index>-<index>")
+    parser.add_argument("--dataset", type=str.upper, default="MSL")
+    parser.add_argument("--group", type=str, default="1-1", help="Required for SMD dataset. <group_index>-<index>")
     parser.add_argument("--window_size", type=int, default=20)
-    parser.add_argument("--window_num",type=int,default=10)
+    parser.add_argument("--window_num",type=int,default=15)
     parser.add_argument("--normalize", type=str2bool, default=True)
     parser.add_argument("--spec_res", type=str2bool, default=False)
 
     # -- Model params ---
-    # 1D conv layer
-    parser.add_argument("--kernel_size", type=int, default=7)
     # GAT layers
     parser.add_argument("--use_gatv2", type=str2bool, default=True)
     parser.add_argument("--structure_feature_embed_dim", type=int, default=64)
@@ -42,7 +40,7 @@ def get_parser():
     parser.add_argument("--alpha", type=float, default=0.2)
 
     # --- Train params ---
-    parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--val_split", type=float, default=0.1)
     parser.add_argument("--bs", type=int, default=256)
     parser.add_argument("--init_lr", type=float, default=1e-3)

@@ -163,9 +163,10 @@ if __name__ == "__main__":
         prediction_args,
     )
 
-    max_idx = (len(train_dataset) + window_num ) * window_size
-    label = y_test[window_size * window_num:max_idx] if y_test is not None else None
-    predictor.predict_anomalies(x_train[:max_idx], x_test[:max_idx], label)
+    train_max_idx = (len(train_dataset) + window_num ) * window_size
+    test_max_idx = (len(test_dataset) + window_num) * window_size
+    label = y_test[window_size * window_num: test_max_idx] if y_test is not None else None
+    predictor.predict_anomalies(x_train[:train_max_idx], x_test[:test_max_idx], label)
 
     # Save config
     args_path = f"{save_path}/config.txt"

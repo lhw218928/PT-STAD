@@ -305,9 +305,19 @@ def adjust_anomaly_scores(scores, dataset, is_train, lookback):
     sep_cuma = np.cumsum(md['num_values'].values) - lookback
     s = [0] + sep_cuma.tolist()
     for c_start, c_end in [(s[i], s[i+1]) for i in range(len(s)-1)]:
-        e_s = adjusted_scores[c_start: c_end+1]
+        # e_s = adjusted_scores[c_start: c_end+1]
+        # e_s = (e_s - np.min(e_s)) / (np.max(e_s) - np.min(e_s))
+        # adjusted_scores[c_start: c_end+1] = e_s
+        if c_start >= c_end or c_start >= len(adjusted_scores) or c_end > len(adjusted_scores):
+            print(f"Warning: Invalid indices c_start={c_start}, c_end={c_end}. Skipping this segment.")
+            continue
 
-        e_s = (e_s - np.min(e_s))/(np.max(e_s) - np.min(e_s))
-        adjusted_scores[c_start: c_end+1] = e_s
+        e_s = adjusted_scores[c_start: c_end + 1]
+        if len(e_s) == 0:
+            print(f"Warning: Empty segment at c_start={c_start}, c_end={c_end}. Skipping normalization.")
+            continue
+
+        e_s = (e_s - np.min(e_s)) / (np.max(e_s) - np.min(e_s))
+        adjusted_scores[c_start: c_end + 1] = e_s
 
     return adjusted_scores

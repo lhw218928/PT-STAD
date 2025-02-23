@@ -92,7 +92,8 @@ class Predictor:
             df_dict[f"A_Score_{i}"] = a_score
 
         df = pd.DataFrame(df_dict)
-        anomaly_scores = np.mean(anomaly_scores, 1)
+        # df 包括Forecast_0,Recon_0,True_0,以及A_score_0
+        anomaly_scores = np.mean(anomaly_scores, 1)  #四个值作平均？
         df['A_Score_Global'] = anomaly_scores
 
         return df
@@ -146,6 +147,7 @@ class Predictor:
             test_feature_anom_scores = test_pred_df[f"A_Score_{i}"].values
             epsilon = find_epsilon(train_feature_anom_scores, reg_level=2)
 
+            #大于epsilon 置为1，小于置为0
             train_feature_anom_preds = (train_feature_anom_scores >= epsilon).astype(int)
             test_feature_anom_preds = (test_feature_anom_scores >= epsilon).astype(int)
 
