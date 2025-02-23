@@ -4,40 +4,40 @@ import torch
 class StructureFeatureLayer(nn.Module):
 
     """Structure Feature Extraction Layer
-        :param n_features: Number of input features/nodes
+        :param features_num: Number of input features/nodes
         :param window_size: length of the input sequence
         :param dropout: percentage of nodes to dropout
         :param alpha: negative slope used in the leaky relu activation function
-        :param embed_dim: embedding dimension (output dimension of linear transformation)
+        :param structure_feature_embed_dim: embedding dimension (output dimension of linear transformation)
         :param use_gatv2: whether to use the modified attention mechanism of GATv2 instead of standard GAT
         :param use_bias: whether to include a bias term in the attention layer
         """
 
-    def __init__(self, n_features , window_size, dropout, alpha, embed_dim = None, use_gatv2 = True, use_bias = True):
+    def __init__(self, features_num , window_size, dropout, alpha, structure_feature_embed_dim = None, use_gatv2 = True, use_bias = True):
         super(StructureFeatureLayer, self).__init__()
-        self.n_features = n_features
+        self.features_num = features_num
         self.window_size = window_size
         self.dropout = dropout
-        self.embed_dim = embed_dim if embed_dim is not None else window_size
+        self.structure_feature_embed_dim = structure_feature_embed_dim if structure_feature_embed_dim is not None else window_size
         self.use_gatv2 = use_gatv2
-        self.num_nodes = n_features
+        self.nodes_num = features_num
         self.use_bias = use_bias
 
         # Because linear transformation is done after concatenation in GATv2
         if self.use_gatv2:
-            self.embed_dim *= 2
+            self.structure_feature_embed_dim *= 2
             lin_input_dim = 2 * window_size
-            a_input_dim = self.embed_dim
+            a_input_dim = self.structure_feature_embed_dim
         else:
             lin_input_dim = window_size
-            a_input_dim = 2 * self.embed_dim
+            a_input_dim = 2 * self.structure_feature_embed_dim
 
-        self.lin = nn.Linear(lin_input_dim, self.embed_dim)
+        self.lin = nn.Linear(lin_input_dim, self.structure_feature_embed_dim)
         self.a = nn.Parameter(torch.empty((a_input_dim, 1)))
         nn.init.xavier_uniform_(self.a.data, gain=1.414)
 
         if self.use_bias:
-            self.bias = nn.Parameter(torch.zeros(n_features, n_features))
+            self.bias = nn.Parameter(torch.zeros(features_num, features_num))
 
         self.leakyrelu = nn.LeakyReLU(alpha)
         self.sigmoid = nn.Sigmoid()
@@ -95,7 +95,7 @@ class StructureFeatureLayer(nn.Module):
             vK || vK,
         """
 
-        N = self.num_nodes
+        N = self.nodes_num
         blocks_repeating = v.repeat_interleave(N, dim=1)  # Left-side of the matrix
         # blocks_repeating (b,K*K,window_size)
         blocks_alternating = v.repeat(1, N, 1)  # Right-side of the matrix
@@ -105,7 +105,7 @@ class StructureFeatureLayer(nn.Module):
         if self.use_gatv2:
             return combined.view(v.size(0), N, N, 2 * self.window_size)
         else:
-            return combined.view(v.size(0), N, N, 2 * self.embed_dim)
+            return combined.view(v.size(0), N, N, 2 * self.structure_feature_embed_dim)
 
 class TimeFeatureLayer(nn.Module):
     """Gated Recurrent Unit (GRU) Layer
@@ -118,17 +118,17 @@ class TimeFeatureLayer(nn.Module):
     def __init__(self, in_dim, hid_dim, n_layers, dropout): #in_dim输入特征数量
         super(TimeFeatureLayer, self).__init__()
         self.in_dim = in_dim
-        self.hid_dim = hid_dim
+        self.hid_dim = hid_dim if hid_dim is not None else in_dim
         self.n_layers = n_layers
         self.dropout = 0.0 if n_layers == 1 else dropout
-        self.gru = nn.GRU(in_dim, hid_dim, num_layers=n_layers, batch_first=True, dropout=self.dropout)
+        self.gru = nn.GRU(self.in_dim, self.hid_dim, num_layers=self.n_layers, batch_first=True, dropout=self.dropout)
 
     def forward(self, x):    #x[b,k*w,n]
         batch_size = x.size(0)
         x = x.permute(0,2,1).contiguous()    #x[b,n,k*w]
         x = x.view(-1,x.size(-1)) #x[b*n,k*w]
         x = x.view(x.size()[0],-1,self.in_dim)  #x[b*n,k,w]
-        out, h = self.gru(x)     #out[b*n,k,hid_dim]  h[1,b*n,hid_dim]
+        out, h = self.gru(x)     #out[b*n,k,hid_dim]  h[n_layers,b*n,hid_dim]
         out = out[:,-1,:]
         # out, h = out[-1, :, :], h[-1, :, :]  # Extracting from last layer  一般hidden_dim=window_size
         out ,h = out.view(batch_size,-1,self.hid_dim),h.view(batch_size,-1,self.hid_dim)   #return_size:[b,n,hid_dim]
@@ -143,19 +143,21 @@ class ForecastModule(nn.Module):
         :param dropout: dropout rate
         """
 
-    def __init__(self, in_dim, hid_dim, out_dim, n_layers, dropout):
+    def __init__(self, window_size, in_dim, hid_dim, out_dim, n_layers, dropout):
+        self.out_dim = out_dim
         super(ForecastModule, self).__init__()
         layers = [nn.Linear(in_dim, hid_dim)]
         for _ in range(n_layers - 1):
             layers.append(nn.Linear(hid_dim, hid_dim))
 
-        layers.append(nn.Linear(hid_dim, out_dim))
+        layers.append(nn.Linear(hid_dim, window_size))
 
         self.layers = nn.ModuleList(layers)
         self.dropout = nn.Dropout(dropout)
         self.relu = nn.ReLU()
 
-    def forward(self, x):
+    def forward(self, x):   #[b,n,2w]    out_dim其实就是要预测的变量个数
+        x = x[:,:self.out_dim,:]
         for i in range(len(self.layers) - 1):
             x = self.relu(self.layers[i](x))
             x = self.dropout(x)
@@ -179,7 +181,7 @@ class ReconstructionModule(nn.Module):
         self.fc = nn.Linear(hid_dim, out_dim)
 
     def forward(self, x):
-        # x [b,n,2*hidden_size]   需要去重构这个时间窗口内的值，维度是[b,w,n,out_dim]
+        # x [b,n,2*w]   需要去重构这个时间窗口内的值，输出维度是[b,out_dim,w]
 
         x = x.view(x.size(0),-1)
         x = x.repeat_interleave(self.window_size, dim=1).view(x.size(0), self.window_size,-1)

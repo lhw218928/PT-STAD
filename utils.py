@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
-from statsmodels.tsa.stattools import grangercausalitytests
 from torch.utils.data import DataLoader,Dataset,SubsetRandomSampler
 
 def get_data(dataset, max_train_size=None, max_test_size=None,
@@ -118,9 +117,9 @@ class SlidingWindowDataset(Dataset):
         x = self.data[start:end, :]  # 形状为 (window_num * window_size, N)
         y = self.data[y_start:y_end, :]  # 形状为 (window_size, N)
 
-        # 如果指定了目标维度，只取目标维度
-        if self.target_dim is not None:
-            y = y[:, self.target_dim]  # 形状为 (window_size, target_dim)
+        # # 如果指定了目标维度，只取目标维度
+        # if self.target_dim is not None:
+        #     y = y[:, :self.target_dim]  # 形状为 (window_size, target_dim)
 
         return x, y
 
@@ -175,9 +174,7 @@ def get_target_dims(dataset):
     :return: index of data dimension that should be modeled (forecasted and reconstructed),
                      returns None if all input dimensions should be modeled
     """
-    if dataset == "SMAP":
-        return [0]
-    elif dataset == "MSL":
+    if dataset == "SMAP" or dataset =="MSL":
         return [0]
     elif dataset == "SMD":
         return None

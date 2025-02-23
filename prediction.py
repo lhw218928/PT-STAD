@@ -57,6 +57,7 @@ class Predictor:
 
                 # Shifting input to include the observed value (y) when doing the reconstruction
                 recon_x = torch.cat((x[:, self.window_size:, :], y), dim=1)
+
                 _, window_recon = self.model(recon_x)
 
                 preds.append(y_hat.detach().cpu().numpy())
@@ -70,7 +71,7 @@ class Predictor:
         actual = values.detach().cpu().numpy()[self.window_size*self.window_num:] #self.window_size*self.window_num+recons.shape[0]
 
         if self.target_dims is not None:
-            actual = actual[:, self.target_dims]
+            actual = actual[:, :self.target_dims]
 
         anomaly_scores = np.zeros_like(actual)
         df_dict = {}
@@ -138,7 +139,7 @@ class Predictor:
             test_anomaly_scores = pd.DataFrame(test_anomaly_scores).ewm(span=smoothing_window).mean().values.flatten()
 
         # Find threshold and predict anomalies at feature-level (for plotting and diagnosis purposes)
-        out_dim = self.n_features if self.target_dims is None else len(self.target_dims)
+        out_dim = self.n_features if self.target_dims is None else self.target_dims
         all_preds = np.zeros((len(test_pred_df), out_dim))
         for i in range(out_dim):
             train_feature_anom_scores = train_pred_df[f"A_Score_{i}"].values

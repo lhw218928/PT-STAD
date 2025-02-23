@@ -6,29 +6,26 @@ class PT_STAD(nn.Module):
             self,
             features_num,
             window_size,
+            window_num,
+            target_dims,
             structure_feature_embed_dim = None,
             use_gatv2 = True,
-            time_feature_embed_dim = None,
             gru_layers = 1,
-            gru_hidden_dim = 20,  #默认是64
-            recon_n_layers=1,
-            recon_hid_dim=150,
-            dropout = 0.1,
-            alpha = 0.2,
+            time_feature_embed_dim = None,
+            forecast_hidden_dim = 32,
             forecast_n_layers =1,
-            reconstruction_n_layers = 1
+            recon_hid_dim=150,
+            recon_n_layers = 1,
+            dropout=0.1,
+            alpha=0.2
     ):
         super(PT_STAD, self).__init__()
 
         self.structureAttentionLayer = StructureFeatureLayer(features_num, window_size, dropout, alpha, structure_feature_embed_dim, use_gatv2)
-        self.timeAttentionLayer = TimeFeatureLayer(window_size, gru_hidden_dim, gru_layers, dropout)
-        concat_feature_dim = 2 * window_size
-        forecast_hidden_dim = window_size
-        forecast_out_dim = window_size
-        forecast_n_layers = 2
-
-        self.forecastModule = ForecastModule(concat_feature_dim, forecast_hidden_dim, window_size, forecast_n_layers, dropout)  #将nfeature换成window_size,多步window_size
-        self.reconstructionModule = ReconstructionModule(window_size, features_num * concat_feature_dim, recon_hid_dim, features_num, recon_n_layers, dropout)
+        self.timeAttentionLayer = TimeFeatureLayer(window_size, time_feature_embed_dim, gru_layers, dropout)
+        self.concat_feature_dim = 2 * window_size
+        self.forecastModule = ForecastModule(window_size, self.concat_feature_dim, forecast_hidden_dim, target_dims, forecast_n_layers, dropout)  #将nfeature换成window_size,多步window_size
+        self.reconstructionModule = ReconstructionModule(window_size, features_num * self.concat_feature_dim, recon_hid_dim, target_dims, recon_n_layers, dropout)
 
 
 
@@ -38,14 +35,15 @@ class PT_STAD(nn.Module):
         structedFeatures = self.structureAttentionLayer(x)   #输出结果[b,n,w]
         timeFeatures = self.timeAttentionLayer(x)    #返回结果[b,n,w]
 
-        timeFeatures_hidden = timeFeatures[1]
+        timeFeatures_hidden = timeFeatures[1]  #形状是[b,num_layers*n,w]
 
         Features = torch.cat([structedFeatures, timeFeatures_hidden],dim=2)    #残差连接可以考虑[b,n,2*W]
 
-        Pred_Features = Features.view(-1,Features.size(-1))
+        # Pred_Features = Features.view(-1,Features.size(-1))
 
-        predictions = self.forecastModule(Pred_Features)
-        predictions = predictions.view(x.size(0),-1,predictions.size(1)).permute(0,2,1) #[b,w,n]
+        predictions = self.forecastModule(Features)  #[b,out_dim,w]
+        predictions = predictions.permute(0,2,1) #[b,w,out_dim]
+
 
         recons = self.reconstructionModule(Features)
 

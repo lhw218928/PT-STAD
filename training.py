@@ -111,8 +111,8 @@ class Trainer:
                 preds, recons = self.model(x)
 
                 if self.target_dims is not None:
-                    x = x[:, :, self.target_dims]
-                    y = y[:, :, self.target_dims].squeeze(-1)
+                    x = x[:, :, :self.target_dims]
+                    y = y[:, :, :self.target_dims]#.squeeze(-1)
 
                 # if preds.ndim == 3:
                 #     preds = preds.squeeze(1)
@@ -204,8 +204,9 @@ class Trainer:
                 preds, recons = self.model(x)
 
                 if self.target_dims is not None:
-                    x = x[:, :, self.target_dims]
-                    y = y[:, :, self.target_dims].squeeze(-1)
+                    x = x[:, :, :self.target_dims]
+
+                    y = y[:, :, :self.target_dims]#.squeeze(-1)
 
                 # if preds.ndim == 3:
                 #     preds = preds.squeeze(1)

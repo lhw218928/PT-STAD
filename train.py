@@ -17,7 +17,7 @@ if __name__ == "__main__":
 
     # 参数
     dataset = args.dataset
-    window_size = args.lookback
+    window_size = args.window_size
     window_num = args.window_num
     spec_res = args.spec_res
     normalize = args.normalize
@@ -53,18 +53,15 @@ if __name__ == "__main__":
 
     x_train = torch.from_numpy(x_train).float()
     x_test = torch.from_numpy(x_test).float()
-    n_features = x_train.shape[1]
+    features_num = x_train.shape[1]
 
     target_dims = get_target_dims(dataset)
     if target_dims is None:
-        out_dim = n_features
-        print(f"Will forecast and reconstruct all {n_features} input features")
-    elif type(target_dims) == int:
-        print(f"Will forecast and reconstruct input feature: {target_dims}")
-        out_dim = 1
+        target_dims = features_num
+        print(f"Will forecast and reconstruct all {features_num} input features with size: {window_size}")
     else:
-        print(f"Will forecast and reconstruct input features: {target_dims}")
-        out_dim = len(target_dims)
+        target_dims = 1
+        print(f"Will forecast and reconstruct  {target_dims} input features with size: {window_size}:")
 
     #horizon决定执行单步还是多步预测
     train_dataset = SlidingWindowDataset(data = x_train, window_size = window_size, window_num = window_num, target_dim = target_dims)
@@ -75,19 +72,18 @@ if __name__ == "__main__":
     )
 
     model = PT_STAD(
-        n_features,
+        features_num,
         window_size,
-        out_dim,
-        # kernel_size=args.kernel_size,
-        use_gatv2=args.use_gatv2,
-        # feat_gat_embed_dim=args.feat_gat_embed_dim,
-        # time_gat_embed_dim=args.time_gat_embed_dim,
-        # gru_n_layers=args.gru_n_layers,
-        # gru_hid_dim=args.gru_hid_dim,
-        # forecast_n_layers=args.fc_n_layers,
-        # forecast_hid_dim=args.fc_hid_dim,
-        # recon_n_layers=args.recon_n_layers,
-        # recon_hid_dim=args.recon_hid_dim,
+        window_num,
+        target_dims,
+        structure_feature_embed_dim = None,
+        use_gatv2 = args.use_gatv2,
+        gru_layers = args.gru_n_layers,
+        time_feature_embed_dim = None,
+        forecast_hidden_dim=args.fc_hid_dim,
+        forecast_n_layers=args.fc_n_layers,
+        recon_hid_dim=args.recon_hid_dim,
+        recon_n_layers=args.recon_n_layers,
         dropout=args.dropout,
         alpha=args.alpha
     )
@@ -100,7 +96,7 @@ if __name__ == "__main__":
         model,
         optimizer,
         window_size,
-        n_features,
+        features_num,
         target_dims,
         n_epochs,
         batch_size,
@@ -163,7 +159,7 @@ if __name__ == "__main__":
         best_model,
         window_size,
         window_num,
-        n_features,
+        features_num,
         prediction_args,
     )
 
